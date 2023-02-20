@@ -64,7 +64,7 @@ class Tester:
         
         elif self.task == 'dialog':
             encoding = self.metric_tokenizer([prev, pred], padding=True, return_tensors='pt')
-            bert_out = self.metric_model(**encoding).[0]
+            bert_out = self.metric_model(**encoding)[0]
 
             normalized = F.normalize(bert_out[:, 0, :], p=2, dim=-1)  # Only use of [CLS] token embedding
             dist = normalized.matmul(normalized.T)
