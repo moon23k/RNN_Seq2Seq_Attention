@@ -20,12 +20,8 @@ class Trainer:
         self.train_dataloader = train_dataloader
         self.valid_dataloader = valid_dataloader
 
-        self.criterion = nn.CrossEntropyLoss(ignore_index=config.pad_id, 
-                                             label_smoothing=0.1).to(self.device)
-        self.optimizer = optim.Adam(self.model.parameters(), 
-                                    lr=config.learning_rate, 
-                                    betas=(0.9, 0.98), 
-                                    eps=1e-8)
+        self.criterion = nn.CrossEntropyLoss(ignore_index=config.pad_id, label_smoothing=0.1).to(self.device)
+        self.optimizer = optim.AdamW(self.model.parameters(), lr=config.learning_rate)
         self.scheduler = optim.lr_scheduler.ReduceLROnPlateau(self.optimizer, 'min')
         
         self.ckpt = config.ckpt
@@ -127,11 +123,9 @@ class Trainer:
                 src = batch['src'].to(self.device)
                 trg = batch['trg'].to(self.device)
                 
-                with torch.autocast(device_type=self.device_type, dtype=torch.float16):
-                    logit = self.model(src, trg, teacher_forcing_ratio=0.0)
-
-                    loss = self.criterion(logit.contiguous().view(-1, self.vocab_size),
-                                          trg[:, 1:].contiguous().view(-1))
+                logit = self.model(src, trg, teacher_forcing_ratio=0.0)
+                loss = self.criterion(logit.contiguous().view(-1, self.vocab_size),
+                                      trg[:, 1:].contiguous().view(-1))
                 epoch_loss += loss.item()
         
         epoch_loss = round(epoch_loss / tot_len, 3)

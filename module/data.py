@@ -13,8 +13,6 @@ class Dataset(torch.utils.data.Dataset):
     def load_data(task, split):
         with open(f"data/{task}/{split}.json", 'r') as f:
             data = json.load(f)
-        if split=='train':
-            return data[::3]
         return data
 
     def __len__(self):

@@ -10,9 +10,46 @@ import torch.backends.cudnn as cudnn
 from module.model import load_model
 from module.data import load_dataloader
 
-from module.test import Tester
 from module.train import Trainer
+from module.test import Tester
 from module.search import Search
+
+
+
+
+class Config(object):
+    def __init__(self, args):    
+
+        with open('config.yaml', 'r') as f:
+            params = yaml.load(f, Loader=yaml.FullLoader)
+            for group in params.keys():
+                for key, val in params[group].items():
+                    setattr(self, key, val)
+
+        self.task = args.task
+        self.mode = args.mode
+        self.ckpt = f"ckpt/{self.task}.pt"
+
+        use_cuda = torch.cuda.is_available()
+        self.device_type = 'cuda' if use_cuda else 'cpu'
+        self.device = torch.device(self.device_type)
+
+        if self.task != 'train':
+            if self.task == 'nmt':
+                self.max_pred_len = self.nmt_max_pred_len
+            elif self.task == 'dialog':
+                self.max_pred_len = self.dialog_max_pred_len
+            elif self.task == 'sum':
+                self.max_pred_len = self.sum_max_pred_len
+                self.batch_size = self.batch_size // 8
+
+        if self.task == 'inference':
+            self.search_method = args.search
+            self.device = torch.device('cpu')
+
+    def print_attr(self):
+        for attribute, value in self.__dict__.items():
+            print(f"* {attribute}: {value}")
 
 
 def set_seed(SEED=42):
@@ -25,38 +62,6 @@ def set_seed(SEED=42):
     cudnn.deterministic = True
 
 
-class Config(object):
-    def __init__(self, args):    
-        self.task = args.task
-        self.mode = args.mode
-        self.ckpt = f"ckpt/{self.task}.pt"
-
-        self.iters_to_accumulate = 4
-
-        use_cuda = torch.cuda.is_available()
-        if use_cuda:
-            self.device_type = 'cuda'
-        else:
-            self.device_type = 'cpu'
-
-        if self.task == 'inference':
-            self.search_method = 'greedy'
-            self.device = torch.device('cpu')
-        else:
-            self.search = None
-            self.device = torch.device('cuda' if use_cuda else 'cpu')
-
-        
-        with open('config.yaml', 'r') as f:
-            params = yaml.load(f, Loader=yaml.FullLoader)
-            for group in params.keys():
-                for key, val in params[group].items():
-                    setattr(self, key, val)
-
-    def print_attr(self):
-        for attribute, value in self.__dict__.items():
-            print(f"* {attribute}: {value}")
-
 
 def load_tokenizer(task):
     tokenizer = spm.SentencePieceProcessor()
@@ -65,11 +70,11 @@ def load_tokenizer(task):
     return tokenizer
 
 
-def inference(config, model, tokenizer):
-    if config.task == 'sum':
-        nltk.download('punkt')
 
-    search_module = Search(config, model, tokenizer)
+def inference(config, model, tokenizer):
+    if config.search_method == 'beam':
+        beam = Search(config, model)
+    search_module = Search(config, model)
 
     print(f'--- Inference Process Started! ---')
     print('[ Type "quit" on user input to stop the Process ]')
@@ -79,17 +84,23 @@ def inference(config, model, tokenizer):
 
         #Enc Condition
         if input_seq == 'quit':
-            print('\n--- Inference Process has terminated! ---')
+            print('\n--- Inference Process has Terminated! ---')
             break        
 
         if config.task == 'sum':
             input_seq = nltk.tokenize.sent_tokenize(input_seq)
 
-        if config.search_method == 'beam':
-            output_seq = search_module.beam_search(input_seq)
-        else:
-            output_seq = search_module.greedy_search(input_seq)
-        print(f"Model Out Sequence >> {output_seq}")       
+        input_tensor = torch.LongTensor(tokenizer.encode(input_seq)).unsqueeze(0)
+
+
+        if config.search_method == 'greedy':
+            pred_tensor = search_module.greedy_search(input_tensor)
+        elif config.search_method == 'beam':
+            pred_tensor = search_module.beam_search(input_tensor)
+
+        pred_seq = tokenizer.decode(pred_tensor)
+        print(f"Model Out Sequence >> {tokenizer.decode(pred_seq)}")
+
 
 
 def main(args):
@@ -108,12 +119,11 @@ def main(args):
         test_dataloader = load_dataloader(config, 'test')
         tester = Tester(config, model, test_dataloader, tokenizer)
         tester.test()
-        tester.inference_test()
     
     elif config.mode == 'inference':
         tokenizer = load_tokenizer(args.task)
-        translator = inference(config, model, tokenizer)
-        translator.translate()
+        inference(model, tokenizer)
+        
     
 
 
@@ -129,5 +139,7 @@ if __name__ == '__main__':
 
     if args.task == 'inference':
         assert args.search in ['greedy', 'beam']
+        if args.task == 'sum':
+            nltk.download('punkt')
 
     main(args)

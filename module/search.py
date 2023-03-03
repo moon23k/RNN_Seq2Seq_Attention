@@ -1,33 +1,35 @@
 import torch, operator
 import torch.nn.functional as F
+from itertools import groupby
 from queue import PriorityQueue
 from collections import namedtuple
 
 
 
 class Search:
-    def __init__(self, config, model, tokenizer):
+    def __init__(self, config, model):
         super(Search, self).__init__()
         
         self.beam_size = 4
         self.model = model
         self.task = config.task
-
-        self.tokenizer = tokenizer
         self.device = config.device
 
         self.bos_id = config.bos_id
         self.eos_id = config.eos_id
         self.pad_id = config.pad_id
-        
+
+        self.max_len = config.max_pred_len
         self.Node = namedtuple('Node', ['prev_node', 'pred', 'log_prob', 'hidden', 'length'])
 
 
-    def get_score(self, node, max_repeat, min_length=5, alpha=1.2):
-        repeat = max([node.pred.tolist().count(token) for token in node.pred.tolist() if token != self.pad_id])
+    def get_score(self, node, max_repeat = 5, min_length=5, alpha=1.2):
+        #find max number of consecutively repeated tokens 
+        repeat = max([sum(1 for token in group if token != self.pad_id) for _, group in groupby(node.pred.tolist())])
+        #repeat = max([node.pred.tolist().count(token) for token in node.pred.tolist() if token != self.pad_id])
 
-        if repeat > max_repeat + 5:
-            repeat_penalty = -1
+        if repeat > max_repeat:
+            repeat_penalty = 0.5
         else:
             repeat_penalty = 1
         
@@ -54,27 +56,11 @@ class Search:
         return Node, nodes, [], []    
 
 
-    def get_input_params(self, input_seq):
-        input_tokens = self.tokenizer.encode(input_seq)
-        input_tensor = torch.LongTensor([input_tokens]).to(self.device)
-
-        if self.task != 'sum':
-            max_len = len(input_tokens) + 30
-        else:
-            max_len = 500
-            
-        max_repeat = max([input_tokens.count(token) for token in input_tokens if token != self.pad_id])
-        
-        return input_tensor, max_len, max_repeat        
-
-
-    def beam_search(self, input_seq):
-        input_tensor, max_len, max_repeat = self.get_input_params(input_seq)
-        
+    def beam_search(self, input_tensor):
         hidden = self.model.encoder(input_tensor)
         Node, nodes, end_nodes, top_nodes = self.get_nodes(hidden=hidden)
 
-        for t in range(max_len):
+        for t in range(self.max_len):
             curr_nodes = [nodes.get() for _ in range(self.beam_size)]
             
             for curr_score, curr_node in curr_nodes:
@@ -108,22 +94,18 @@ class Search:
             _, top_node = nodes.get()
         else:
             _, top_node = sorted(end_nodes, key=operator.itemgetter(0), reverse=True)[0]
-        
-        beam_out = top_node.pred.squeeze(0).tolist()
-        return self.tokenizer.decode(beam_out)      
+              
+        return top_node.pred[:, 1:]
     
 
-    def greedy_search(self, input_seq):
-        input_tensor, max_len, _ = self.get_input_params(input_seq)
-
-        output_seq = [[self.pad_id  if i else self.bos_id for i in range(max_len)]]        
-        output_tensor = torch.LongTensor(output_seq).to(self.device)
-        dec_input = output_tensor[:, 0]
-
+    def greedy_search(self, input_tensor):
         hiddens = self.model.encoder(input_tensor)
-        for i in range(1, max_len):
+        output_tensor = torch.zeros(self.max_len, input_tensor.size(0)).to(self.device)
+        dec_input = output_tensor[:, 0]
+        
+        for i in range(1, self.max_len):
             out, hiddens = self.model.decoder(dec_input, hiddens)
             output_tensor[:, i] = out.argmax(-1)
             dec_input = output_tensor[:, i]
 
-        return self.tokenizer.decode(output_tensor.squeeze(0).tolist())
+        return output_tensor.contiguous().permute(1, 0, 2)[:, 1:]

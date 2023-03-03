@@ -1,7 +1,7 @@
 import torch, os
 import torch.nn as nn
-from model.base import Attention
-from model.hier import HierAttention
+from model.base import BaseModel
+from model.hier import HierModel
 
 
 
