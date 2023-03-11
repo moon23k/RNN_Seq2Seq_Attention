@@ -187,10 +187,10 @@ def build_vocab(task):
 
 
 
-def tokenize_data(task, tokenized, tokenizer):
+def tokenize_data(task, tokenizer, data_obj):
     max_trg_len = 0
-    tokenized_data = []
-    for elem in tokenized:
+    tokenized = []
+    for elem in data_obj:
         temp_dict = dict()
         
         if task == 'sum':
@@ -206,7 +206,7 @@ def tokenize_data(task, tokenized, tokenizer):
         if max_trg_len < len(temp_dict['trg']):
             max_trg_len = len(temp_dict['trg'])
 
-        tokenized_data.append(temp_dict)
+        tokenized.append(temp_dict)
 
     with open('config.yaml', 'r') as f:
         config = yaml.load(f, Loader=yaml.FullLoader)
@@ -215,7 +215,7 @@ def tokenize_data(task, tokenized, tokenizer):
     with open('config.yaml', 'w') as f:
         yaml.dump(config, f)        
     
-    return tokenized_data
+    return tokenized
 
 
 def save_data(task, data_obj):
@@ -252,7 +252,7 @@ def main(task):
 
     #Tokenize Datasets
     tokenizer = load_tokenizer(task)
-    tokenized = tokenize_data(task, processed, tokenizer)
+    tokenized = tokenize_data(task, tokenizer, processed)
 
     #Save Data
     save_data(task, tokenized)
