@@ -88,13 +88,13 @@ def load_dataloader(config, split):
     if config.task == 'sum':
         return DataLoader(Dataset(config.task, split), 
                           batch_size=config.batch_size, 
-                          shuffle=True, 
+                          shuffle=True if config.mode=='train' else False, 
                           collate_fn=sum_collate,
                           num_workers=2)
 
 
     return DataLoader(Dataset(config.task, split), 
                       batch_size=config.batch_size, 
-                      shuffle=True,
+                      shuffle=True if config.mode=='train' else False,
                       collate_fn=base_collate,
                       num_workers=2)

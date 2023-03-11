@@ -32,24 +32,21 @@ class Tester:
 
 
     def test(self):
+        greedy_metric_score, beam_metric_score = 0, 0
         with torch.no_grad():
-            print(f'Test Results on {config.task.upper()}')
+            print(f'Test Results on {self.task.upper()}')
             for idx, batch in enumerate(self.dataloader):
                 src = batch['src'].to(self.device)
                 trg = batch['trg'].to(self.device)
 
                 greedy_pred = self.search.greedy_search(src)
                 beam_pred = self.search.beam_search(src)
-                
-                greedy_metric_score = self.metric_score(greedy_pred, trg)
-                beam_metric_score = self.metric_score(beam_pred, trg)
 
-                if not (idx + 1 % 100):
-                    print(f'Total Greedy Test Metric Score: {tot_greedy_metric_score}')
-                    print(f'Total  Beam  Test Metric Score: {tot_beam_metric_score}')
+                greedy_metric_score += self.metric_score(greedy_pred, trg)
+                beam_metric_score += self.metric_score(beam_pred, trg)
 
-        print(f'Total Greedy Test Metric Score: {tot_greedy_metric_score}')
-        print(f'Total  Beam  Test Metric Score: {tot_beam_metric_score}')
+        print(f'Total Greedy Test Metric Score: {greedy_metric_score}')
+        print(f'Total  Beam  Test Metric Score: {beam_metric_score}')
 
 
 

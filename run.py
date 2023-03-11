@@ -41,7 +41,7 @@ class Config(object):
                 self.max_pred_len = self.dialog_max_pred_len
             elif self.task == 'sum':
                 self.max_pred_len = self.sum_max_pred_len
-                self.batch_size = self.batch_size // 8
+                self.batch_size = self.batch_size // 4
 
         if self.task == 'inference':
             self.search_method = args.search
