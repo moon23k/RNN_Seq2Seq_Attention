@@ -25,9 +25,18 @@ class Dataset(torch.utils.data.Dataset):
 
 
 
-def load_dataloader(config, split):
-    global pad_id
-    pad_id = config.pad_id    
+
+class Collator(object):
+    def __init__(self, config):
+        self.task = config.task
+        self.pad_id = config.pad_id
+
+    def __call__(self, batch):
+        if self.task != 'sum':
+            return self.base_collate(batch)
+        elif self.task == 'feat':
+            return self.sum_collate(batch)
+
 
     def base_collate(batch):
         src_batch, trg_batch = [], []
@@ -36,13 +45,8 @@ def load_dataloader(config, split):
             src_batch.append(torch.LongTensor(src))
             trg_batch.append(torch.LongTensor(trg))
         
-        src_batch = pad_sequence(src_batch,
-                                 batch_first=True,
-                                 padding_value=pad_id)
-        
-        trg_batch = pad_sequence(trg_batch, 
-                                 batch_first=True, 
-                                 padding_value=pad_id)
+        src_batch = self.pad_batch(src_batch)
+        trg_batch = self.pad_batch(trg_batch)
         
         return {'src': src_batch, 
                 'trg': trg_batch}
@@ -79,22 +83,21 @@ def load_dataloader(config, split):
             src_batch.append(doc)
 
         src_batch = torch.tensor(src_batch, dtype=torch.long)
-        trg_batch = pad_sequence(trg_batch, batch_first=True, padding_value=pad_id)
+        trg_batch = self.pad_batch(trg_batch)
 
         return {'src': src_batch, 
                 'trg': trg_batch}
 
 
-    if config.task == 'sum':
-        return DataLoader(Dataset(config.task, split), 
-                          batch_size=config.batch_size, 
-                          shuffle=True if config.mode=='train' else False, 
-                          collate_fn=sum_collate,
-                          num_workers=2)
+
+    def pad_batch(self, batch):
+        return pad_sequence(batch, batch_first=True, padding_value=self.pad_id)
 
 
+def load_dataloader(config, split):
     return DataLoader(Dataset(config.task, split), 
                       batch_size=config.batch_size, 
                       shuffle=True if config.mode=='train' else False,
-                      collate_fn=base_collate,
+                      collate_fn=Collator(config),
+                      pin_memory=True,
                       num_workers=2)
