@@ -24,6 +24,9 @@ class Trainer:
         self.optimizer = optim.AdamW(self.model.parameters(), lr=config.learning_rate)
         self.scheduler = optim.lr_scheduler.ReduceLROnPlateau(self.optimizer, 'min')
         
+        self.early_stop = config.early_stop
+        self.patience = config.patience
+
         self.ckpt = config.ckpt
         self.record_path = f"ckpt/{config.task}.json"
         self.record_keys = ['epoch', 'train_loss', 'train_ppl',
@@ -51,7 +54,10 @@ class Trainer:
 
 
     def train(self):
-        best_loss, records = float('inf'), []
+        records = []
+        best_loss = float('inf')
+        patience = self.patience
+
         for epoch in range(1, self.n_epochs + 1):
             start_time = time.time()
 
@@ -73,6 +79,18 @@ class Trainer:
                             'model_state_dict': self.model.state_dict(),
                             'optimizer_state_dict': self.optimizer.state_dict()},
                             self.ckpt)
+                #patience intialize
+                if self.early_stop:
+                    patience = self.patience
+            
+            else:
+                if not self.early_stop:
+                    continue
+                patience -= 1
+                if not patience:
+                    print('\n--- Training Ealry Stopped ---')
+                    break
+
             
         #save train_records
         with open(self.record_path, 'w') as fp:

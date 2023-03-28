@@ -21,6 +21,8 @@ model:
 
 train:
     clip: 1
+    early_stup: 1
+    patience: 3
     n_epochs: 10
     batch_size: 64
     learning_rate: 0.001
