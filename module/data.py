@@ -38,7 +38,7 @@ class Collator(object):
             return self.sum_collate(batch)
 
 
-    def base_collate(batch):
+    def base_collate(self, batch):
         src_batch, trg_batch = [], []
         
         for src, trg in batch:
@@ -67,13 +67,13 @@ class Collator(object):
                 if max_seq_len < len(seq):
                     max_seq_len = len(seq)
         
-        pad_seq = [pad_id for _ in range(max_seq_len)]
+        pad_seq = [self.pad_id for _ in range(max_seq_len)]
         for _doc in _src_batch:
             doc = []
             for seq in _doc:
                 len_gap = max_seq_len - len(seq)
                 if len_gap:
-                    seq += [pad_id] * len_gap
+                    seq += [self.pad_id] * len_gap
                 doc.append(seq)
 
             num_gap = max_seq_num - len(_doc)
@@ -87,7 +87,6 @@ class Collator(object):
 
         return {'src': src_batch, 
                 'trg': trg_batch}
-
 
 
     def pad_batch(self, batch):

@@ -21,7 +21,7 @@ model:
 
 train:
     clip: 1
-    early_stup: 1
+    early_stop: 1
     patience: 3
     n_epochs: 10
     batch_size: 64

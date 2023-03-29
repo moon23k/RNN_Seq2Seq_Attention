@@ -39,7 +39,7 @@ def load_model(config):
     else:
         model = BaseModel(config)
     
-    model.apply(init_uniform)
+    model.apply(init_normal)
     print(f"Initialized model for {config.task} task has loaded")
 
     if config.mode != 'train':

@@ -8,7 +8,7 @@ import torch.nn.functional as F
 class Encoder(nn.Module):
     def __init__(self, config):
         super(Encoder, self).__init__()
-        self.embedding = nn.Embedding(config.input_dim, config.emb_dim)
+        self.embedding = nn.Embedding(config.vocab_size, config.emb_dim)
         self.rnn = nn.GRU(config.emb_dim, 
                           config.hidden_dim, 
                           bidirectional=True, 
@@ -45,13 +45,13 @@ class Attention(nn.Module):
 class Decoder(nn.Module):
     def __init__(self, config):
         super(Decoder, self).__init__()
-        self.output_dim = config.output_dim
+        self.output_dim = config.vocab_size
         self.attention = Attention(config)
-        self.emb = nn.Embedding(config.output_dim, config.emb_dim)
+        self.emb = nn.Embedding(self.output_dim, config.emb_dim)
         self.rnn = nn.GRU((config.hidden_dim * 2) + config.emb_dim, 
                           config.hidden_dim, 
                           batch_first=True)
-        self.fc_out = nn.Linear((config.hidden_dim * 3) + config.emb_dim, config.output_dim)
+        self.fc_out = nn.Linear((config.hidden_dim * 3) + config.emb_dim, self.output_dim)
         self.dropout = nn.Dropout(config.dropout_ratio)
         
 
@@ -79,7 +79,7 @@ class HierModel(nn.Module):
         super(HierModel, self).__init__()
 
         self.device = config.device
-        self.output_dim = config.output_dim
+        self.output_dim = config.vocab_size
         
         self.encoder = Encoder(config)
         self.decoder = Decoder(config)
