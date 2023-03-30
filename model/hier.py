@@ -1,5 +1,4 @@
-import random
-import torch
+import random, torch
 import torch.nn as nn
 import torch.nn.functional as F
 
@@ -9,10 +8,17 @@ class Encoder(nn.Module):
     def __init__(self, config):
         super(Encoder, self).__init__()
         self.embedding = nn.Embedding(config.vocab_size, config.emb_dim)
-        self.rnn = nn.GRU(config.emb_dim, 
-                          config.hidden_dim, 
-                          bidirectional=True, 
-                          batch_first=True)
+        
+        self.sequence_rnn = nn.GRU(config.emb_dim, 
+                                   config.hidden_dim, 
+                                   bidirectional=True, 
+                                   batch_first=True)
+
+        self.context_rnn = nn.GRU(config.emb_dim, 
+                                  config.hidden_dim, 
+                                  bidirectional=True, 
+                                  batch_first=True)
+
         self.fc = nn.Linear(config.hidden_dim * 2, config.hidden_dim)
         self.dropout = nn.Dropout(config.dropout_ratio)
 

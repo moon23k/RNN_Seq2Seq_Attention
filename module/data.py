@@ -34,7 +34,7 @@ class Collator(object):
     def __call__(self, batch):
         if self.task != 'sum':
             return self.base_collate(batch)
-        elif self.task == 'feat':
+        elif self.task == 'sum':
             return self.sum_collate(batch)
 
 
@@ -52,7 +52,7 @@ class Collator(object):
                 'trg': trg_batch}
 
 
-    def sum_collate(batch):
+    def sum_collate(self, batch):
         src_batch, _src_batch, trg_batch = [], [], []
         max_seq_num, max_seq_len = 0, 0
 
