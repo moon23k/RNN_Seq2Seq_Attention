@@ -42,7 +42,8 @@ def preprocess_nmt(orig_data, volumn=32000):
             temp_dict['src'] = src
             temp_dict['trg'] = trg
             processed.append(temp_dict)
-            concat.append(src + trg)
+            concat.append(src)
+            concat.append(trg)
             
             #End condition
             volumn_cnt += 1
@@ -105,7 +106,8 @@ def preprocess_dialog(orig_data, volumn=32000):
         temp_dict['src'] = src
         temp_dict['trg'] = trg
         
-        concat.append(src + trg)
+        concat.append(src)
+        concat.append(trg)
         processed.append(temp_dict)
 
         #End Condition
@@ -153,7 +155,8 @@ def preprocess_sum(orig_data, volumn=32000):
         temp_dict['src'] = src_split
         temp_dict['trg'] = trg
 
-        concat.append(src + trg)
+        concat.append(src)
+        concat.append(trg)
         processed.append(temp_dict)
 
         volumn_cnt += 1
