@@ -1,32 +1,44 @@
-import os, re, json 
-import yaml, nltk, argparse
-import sentencepiece as spm
-from run import load_tokenizer
+import os, re, json, yaml, argparse
 from datasets import load_dataset
+from tokenizers.models import WordPiece
+from tokenizers import Tokenizer, normalizers
+from tokenizers.trainers import WordPieceTrainer
+from tokenizers.pre_tokenizers import Whitespace
+from tokenizers.normalizers import NFD, Lowercase, StripAccents
 
 
 
 def load_data(task):
     if task == 'nmt':
         data = load_dataset('wmt14', 'de-en', split='train')['translation']
-        
+
     elif task == 'dialog':
-        data = load_dataset('daily_dialog', split='train')['dialog']
+        loaded_data = load_dataset('daily_dialog')
+        data = loaded_data['train']['dialog'] + \
+               loaded_data['validation']['dialog'] + \
+               loaded_data['test']['dialog']
 
     elif task == 'sum':
-        data = load_dataset('cnn_dailymail', '3.0.0', split='train')
+        loaded_data = load_dataset('cnn_dailymail', '3.0.0')
 
+        data = []
+        for split in ['train', 'validation', 'test']:
+            for elem in loaded_data[split]:
+                data.append({'article': elem['article'], 
+                             'highlights': elem['highlights']})
+                
     return data
 
 
+
 #NMT
-def preprocess_nmt(orig_data, volumn=32000):
+def process_nmt(orig_data, volumn=101100):
     min_len = 10 
     max_len = 300
     max_diff = 50
 
     volumn_cnt = 0
-    concat, processed = [], []
+    corpus, processed = [], []
     
     for elem in orig_data:
         temp_dict = dict()
@@ -42,24 +54,25 @@ def preprocess_nmt(orig_data, volumn=32000):
             temp_dict['src'] = src
             temp_dict['trg'] = trg
             processed.append(temp_dict)
-            concat.append(src + trg)
+            corpus.append(src)
+            corpus.append(trg)
             
             #End condition
             volumn_cnt += 1
             if volumn_cnt == volumn:
                 break
 
-    with open('data/nmt/concat.txt', 'w') as f:
-        f.write('\n'.join(concat))
+    with open('data/nmt/corpus.txt', 'w') as f:
+        f.write('\n'.join(corpus))
 
     return processed
 
 
+
 #Dialog
-def preprocess_dialog(orig_data, volumn=32000):
-    volumn_cnt = 0
+def process_dialog(orig_data):
     src_list, trg_list = [], []
-    concat, processed = [], []
+    corpus, processed = [], []
 
     for dial in orig_data:
         dial_list = []
@@ -105,162 +118,117 @@ def preprocess_dialog(orig_data, volumn=32000):
         temp_dict['src'] = src
         temp_dict['trg'] = trg
         
-        concat.append(src + trg)
+        corpus.append(src)
+        corpus.append(trg)
         processed.append(temp_dict)
 
-        #End Condition
-        volumn_cnt += 1
-        if volumn_cnt == volumn:
-            break
         
-    with open('data/dialog/concat.txt', 'w') as f:
-        f.write('\n'.join(concat))
+    with open('data/dialog/corpus.txt', 'w') as f:
+        f.write('\n'.join(corpus))
     
-    return processed
+    return processed    
+
 
 
 #Sum
-def preprocess_sum(orig_data, volumn=32000):
-    max_num = 50 
-    min_len = 500 
-    max_len = 2000
-
+def process_sum(orig_data, volumn=101100):
+    corpus, processed = [], []
+    min_len, max_len = 500, 3000
     volumn_cnt = 0
-    concat, processed = [], []
+
 
     for elem in orig_data:
-        src, trg = elem['article'].lower(), elem['highlights'].lower()
+        src, trg = elem['article'], elem['highlights']
 
-        #Filter too Short or too Long Context
-        if not (min_len < len(src) < max_len):
-            continue
-        if len(trg) > min_len:
-            continue
-        
-        #Filter too long Sentences 
-        src_split = nltk.tokenize.sent_tokenize(src)
-        if len(src_split) > max_num:
-            continue
-        for seq in src_split:
-            if len(seq) > min_len:
-                continue
+        if min_len < len(src) < max_len:
+            if len(trg) < min_len:
+                
+                #Lowercase
+                src, trg = src.lower(), trg.lower()
 
-        #remove unnecessary characters in trg sequence
-        trg = re.sub(r'\n', ' ', trg)                 #remove \n
-        trg = re.sub(r"\s([.](?:\s|$))", r'\1', trg)  #remove whitespace in front of dot
+                #Remove unnecessary characters in trg sequence
+                trg = re.sub(r'\n', ' ', trg)                 #remove \n
+                trg = re.sub(r"\s([.](?:\s|$))", r'\1', trg)  #remove whitespace in front of dot
 
-        temp_dict = dict()
-        temp_dict['src'] = src_split
-        temp_dict['trg'] = trg
+                processed.append({'src': src, 'trg': trg})
+                corpus.append(src)
+                corpus.append(trg)
 
-        concat.append(src + trg)
-        processed.append(temp_dict)
+                #End Condition
+                volumn_cnt += 1
+                if volumn_cnt == volumn:
+                    break
 
-        volumn_cnt += 1
-        if volumn_cnt == volumn:
-            break
+
+    with open('data/sum/corpus.txt', 'w') as f:
+        f.write('\n'.join(corpus))
     
-    with open('data/sum/concat.txt', 'w') as f:
-        f.write('\n'.join(concat))
+    return processed           
+
+
+
+def train_tokenizer(task):
+    assert os.path.exists(corpus_path)
+    corpus_path = f'data/{task}/corpus.txt'
     
-    return processed
-
-
-def build_vocab(task):
     assert os.path.exists('config.yaml')
     with open('config.yaml', 'r') as f:
         vocab_config = yaml.load(f, Loader=yaml.FullLoader)['vocab']
 
-    assert os.path.exists(f'data/{task}/concat.txt')
-    opt = f"--input=data/{task}/concat.txt\
-            --model_prefix=data/{task}/spm\
-            --vocab_size={vocab_config['vocab_size']}\
-            --character_coverage={vocab_config['coverage']}\
-            --model_type={vocab_config['type']}\
-            --pad_id={vocab_config['pad_id']} --pad_piece={vocab_config['pad_piece']}\
-            --unk_id={vocab_config['unk_id']} --unk_piece={vocab_config['unk_piece']}\
-            --bos_id={vocab_config['bos_id']} --bos_piece={vocab_config['bos_piece']}\
-            --eos_id={vocab_config['eos_id']} --eos_piece={vocab_config['eos_piece']}"
+    tokenizer = Tokenizer(WordPiece(unk_token="[UNK]"))
+    tokenizer.normalizer = normalizers.Sequence([NFD(), Lowercase(), StripAccents()])
+    tokenizer.pre_tokenizer = Whitespace()
+    trainer = WordPieceTrainer(vocab_size=vocab_config['vocab_size'], 
+                               special_tokens=[vocab_config['pad_token'], 
+                                               vocab_config['unk_token'],
+                                               vocab_config['bos_token'],
+                                               vocab_config['eos_token']])
 
-    spm.SentencePieceTrainer.Train(opt)
-    os.remove(f'data/{task}/concat.txt')
+    tokenizer.train(files=[corpus_path], trainer=trainer)
+    tokenizer.save(f"data/{task}/tokenizer.json")
 
-
-
-def tokenize_data(task, tokenizer, data_obj):
-    max_trg_len = 0
-    tokenized = []
-    for elem in data_obj:
-        temp_dict = dict()
-        
-        if task == 'sum':
-            temp = []
-            for seq in elem['src']:
-                temp.append(tokenizer.EncodeAsIds(seq))
-            temp_dict['src'] = temp
-        else:    
-            temp_dict['src'] = tokenizer.EncodeAsIds(elem['src'])
-
-        temp_dict['trg'] = tokenizer.EncodeAsIds(elem['trg'])
-
-        if max_trg_len < len(temp_dict['trg']):
-            max_trg_len = len(temp_dict['trg'])
-
-        tokenized.append(temp_dict)
-
-    with open('config.yaml', 'r') as f:
-        config = yaml.load(f, Loader=yaml.FullLoader)
-        config['model'][f'{task}_max_pred_len'] = max_trg_len
-
-    with open('config.yaml', 'w') as f:
-        yaml.dump(config, f)        
-    
-    return tokenized
 
 
 def save_data(task, data_obj):
     #split data into train/valid/test sets
-    train, valid, test = data_obj[:-2000], data_obj[-2000:-1000], data_obj[-1000:]
+    train, valid, test = data_obj[:-1100], data_obj[-1100:-100], data_obj[-100:]
     data_dict = {k:v for k, v in zip(['train', 'valid', 'test'], [train, valid, test])}
 
     for key, val in data_dict.items():
         with open(f'data/{task}/{key}.json', 'w') as f:
             json.dump(val, f)        
         assert os.path.exists(f'data/{task}/{key}.json')
-    
 
 
-def main(task):
+
+
+def main(task, vocab_size):
     #Prerequisite
     os.makedirs(f'data/{task}', exist_ok=True)
-    if task == 'sum':
-        nltk.download('punkt')
 
     #Load Original Data
     orig = load_data(task)
 
     #PreProcess Data
     if task == 'nmt':
-        processed = preprocess_nmt(orig)
+        processed = process_nmt(orig)
     elif task == 'dialog':
-        processed = preprocess_dialog(orig)
+        processed = process_dialog(orig)
     elif task == 'sum':
-        processed = preprocess_sum(orig)        
+        processed = process_sum(orig)        
 
-    #Build Vocab
-    build_vocab(task)
-
-    #Tokenize Datasets
-    tokenizer = load_tokenizer(task)
-    tokenized = tokenize_data(task, tokenizer, processed)
+    #Train Tokenizer
+    train_tokenizer(task, vocab_size)
 
     #Save Data
-    save_data(task, tokenized)
+    save_data(task, processed)
+
 
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument('-task', required=True)
+    parser.add_argument('-vocab_size', default=5000, required=False)
     
     args = parser.parse_args()
     assert args.task in ['all', 'nmt', 'dialog', 'sum']
@@ -269,4 +237,4 @@ if __name__ == '__main__':
         for task in ['nmt', 'dialog', 'sum']:
             main(task)
     else: 
-        main(args.task)
+        main(args.task)    

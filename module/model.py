@@ -1,11 +1,10 @@
 import torch, os
 import torch.nn as nn
-from model.base import BaseModel
-from model.hier import HierModel
+from model.model import SeqGenModel
 
 
 
-def init_normal(model):
+def init_weights(model):
     for name, param in model.named_parameters():
         if 'weight' in name:
             nn.init.normal_(param.data, mean=0, std=0.01)
@@ -34,12 +33,9 @@ def check_size(model):
 
 
 def load_model(config):
-    if config.task == 'sum':
-        model = HierModel(config)
-    else:
-        model = BaseModel(config)
-    
-    model.apply(init_normal)
+    model = SeqGenModel(config)    
+    init_weights(model)
+
     print(f"Initialized model for {config.task} task has loaded")
 
     if config.mode != 'train':

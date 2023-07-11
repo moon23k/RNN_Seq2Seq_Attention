@@ -1,19 +1,28 @@
 import numpy as np
-import sentencepiece as spm
-import os, yaml, random, argparse, nltk
+import os, yaml, random, argparse
 
 import torch
-import torch.nn as nn
-import torch.optim as optim
 import torch.backends.cudnn as cudnn
 
+from module.test import Tester
+from module.train import Trainer
+from module.search import Search
 from module.model import load_model
 from module.data import load_dataloader
 
-from module.train import Trainer
-from module.test import Tester
-from module.search import Search
+from tokenizers import Tokenizer
+from tokenizers.processors import TemplateProcessing
 
+
+
+def set_seed(SEED=42):
+    random.seed(SEED)
+    np.random.seed(SEED)
+    torch.manual_seed(SEED)
+    torch.cuda.manual_seed(SEED)
+    torch.cuda.manual_seed_all(SEED)
+    cudnn.benchmark = False
+    cudnn.deterministic = True
 
 
 
@@ -30,45 +39,37 @@ class Config(object):
         self.mode = args.mode
         self.ckpt = f"ckpt/{self.task}.pt"
 
-        use_cuda = torch.cuda.is_available()
-        self.device_type = 'cuda' if use_cuda else 'cpu'
-        self.device = torch.device(self.device_type)
-
         if self.task == 'sum':
             self.batch_size = self.batch_size // 4
 
-        if self.task != 'train':
-            if self.task == 'nmt':
-                self.max_pred_len = self.nmt_max_pred_len
-            elif self.task == 'dialog':
-                self.max_pred_len = self.dialog_max_pred_len
-            elif self.task == 'sum':
-                self.max_pred_len = self.sum_max_pred_len
-
+        use_cuda = torch.cuda.is_available()
+        self.device_type = 'cuda' if use_cuda else 'cpu'
+        
         if self.task == 'inference':
             self.search_method = args.search
             self.device = torch.device('cpu')
+        else:
+            self.search = None
+            self.device = torch.device(self.device_type)
+
 
     def print_attr(self):
         for attribute, value in self.__dict__.items():
             print(f"* {attribute}: {value}")
 
 
-def set_seed(SEED=42):
-    random.seed(SEED)
-    np.random.seed(SEED)
-    torch.manual_seed(SEED)
-    torch.cuda.manual_seed(SEED)
-    torch.cuda.manual_seed_all(SEED)
-    cudnn.benchmark = False
-    cudnn.deterministic = True
 
+def load_tokenizer(config):
+    tokenizer_path = f"data/{config.task}/tokenizer.json"
+    assert os.path.exists(tokenizer_path)
 
-
-def load_tokenizer(task):
-    tokenizer = spm.SentencePieceProcessor()
-    tokenizer.load(f'data/{task}/spm.model')
-    tokenizer.SetEncodeExtraOptions('bos:eos')
+    tokenizer = Tokenizer.from_file(tokenizer_path)    
+    tokenizer.post_processor = TemplateProcessing(
+        single=f"{config.bos_token} $A {config.eos_token}",
+        special_tokens=[(config.bos_token, config.bos_id), 
+                        (config.eos_token, config.eos_id)]
+        )
+    
     return tokenizer
 
 
@@ -89,9 +90,6 @@ def inference(config, model, tokenizer):
             print('\n--- Inference Process has Terminated! ---')
             break        
 
-        if config.task == 'sum':
-            input_seq = nltk.tokenize.sent_tokenize(input_seq)
-
         input_tensor = torch.LongTensor(tokenizer.encode(input_seq)).unsqueeze(0)
 
 
@@ -109,21 +107,20 @@ def main(args):
     set_seed()
     config = Config(args)
     model = load_model(config)
+    tokenizer = load_tokenizer(config)
 
     if config.mode == 'train':
-        train_dataloader = load_dataloader(config, 'train')
-        valid_dataloader = load_dataloader(config, 'valid')
+        train_dataloader = load_dataloader(config, tokenizer, 'train')
+        valid_dataloader = load_dataloader(config, tokenizer, 'valid')
         trainer = Trainer(config, model, train_dataloader, valid_dataloader)
         trainer.train()
     
     elif config.mode == 'test':
-        tokenizer = load_tokenizer(args.task)
-        test_dataloader = load_dataloader(config, 'test')
-        tester = Tester(config, model, test_dataloader, tokenizer)
+        test_dataloader = load_dataloader(config, tokenizer, 'test')
+        tester = Tester(config, model, tokenizer, test_dataloader)
         tester.test()
     
     elif config.mode == 'inference':
-        tokenizer = load_tokenizer(args.task)
         inference(model, tokenizer)
         
     
@@ -133,15 +130,15 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument('-task', required=True)
     parser.add_argument('-mode', required=True)
+    parser.add_argument('-attention', required=True)
     parser.add_argument('-search', default='greedy', required=False)
     
     args = parser.parse_args()
     assert args.task in ['nmt', 'dialog', 'sum']
+    assert args.attention in ['additive', 'dot_product', 'scaled_dot_product']
     assert args.mode in ['train', 'test', 'inference']
 
     if args.task == 'inference':
         assert args.search in ['greedy', 'beam']
-        if args.task == 'sum':
-            nltk.download('punkt')
 
     main(args)

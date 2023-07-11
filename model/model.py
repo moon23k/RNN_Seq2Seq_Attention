@@ -1,6 +1,10 @@
 import random, torch
 import torch.nn as nn
 import torch.nn.functional as F
+from model.attention import (AdditiveAttention, 
+                             DotProductAttention, 
+                             ScaledDotProductAttention)
+
 
 
 
@@ -8,17 +12,10 @@ class Encoder(nn.Module):
     def __init__(self, config):
         super(Encoder, self).__init__()
         self.embedding = nn.Embedding(config.vocab_size, config.emb_dim)
-        
-        self.sequence_rnn = nn.GRU(config.emb_dim, 
-                                   config.hidden_dim, 
-                                   bidirectional=True, 
-                                   batch_first=True)
-
-        self.context_rnn = nn.GRU(config.emb_dim, 
-                                  config.hidden_dim, 
-                                  bidirectional=True, 
-                                  batch_first=True)
-
+        self.rnn = nn.GRU(config.emb_dim, 
+                          config.hidden_dim, 
+                          bidirectional=True, 
+                          batch_first=True)
         self.fc = nn.Linear(config.hidden_dim * 2, config.hidden_dim)
         self.dropout = nn.Dropout(config.dropout_ratio)
 
@@ -33,26 +30,19 @@ class Encoder(nn.Module):
 
 
 
-class Attention(nn.Module):
-    def __init__(self, config):
-        super(Attention, self).__init__()
-        self.attn = nn.Linear((config.hidden_dim * 3), config.hidden_dim)
-        self.v = nn.Linear(config.hidden_dim, 1, bias=False)
-
-
-    def forward(self, hidden, enc_out):
-        hidden = hidden.unsqueeze(1).repeat(1, enc_out.size(1), 1)
-        energy = torch.tanh(self.attn(torch.cat([hidden, enc_out], dim=2)))
-        attn_value = self.v(energy).squeeze(2)
-        return F.softmax(attn_value, dim=1) #[batch_size, seq_len]
-
-
-
 class Decoder(nn.Module):
     def __init__(self, config):
         super(Decoder, self).__init__()
         self.output_dim = config.vocab_size
-        self.attention = Attention(config)
+        
+        if config.attn_type == 'additive':
+            self.attention = AdditiveAttention(config.hidden_dim)
+        elif config.attn_type == 'dot_product':
+            self.attention = DotProductAttention()
+        elif config.attn_type == 'scaled_dot_product':
+            self.attention = ScaledDotProductAttention()
+
+
         self.emb = nn.Embedding(self.output_dim, config.emb_dim)
         self.rnn = nn.GRU((config.hidden_dim * 2) + config.emb_dim, 
                           config.hidden_dim, 
@@ -80,9 +70,9 @@ class Decoder(nn.Module):
 
 
         
-class HierModel(nn.Module):
+class SeqGenModel(nn.Module):
     def __init__(self, config):
-        super(HierModel, self).__init__()
+        super(SeqGenModel, self).__init__()
 
         self.device = config.device
         self.output_dim = config.vocab_size
