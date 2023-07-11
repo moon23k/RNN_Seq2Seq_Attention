@@ -54,8 +54,13 @@ def process_nmt(orig_data, volumn=101100):
             temp_dict['src'] = src
             temp_dict['trg'] = trg
             processed.append(temp_dict)
+<<<<<<< HEAD
             corpus.append(src)
             corpus.append(trg)
+=======
+            concat.append(src)
+            concat.append(trg)
+>>>>>>> 97cf1befdba30ce2667f9e4536bb52f6149e17ac
             
             #End condition
             volumn_cnt += 1
@@ -118,8 +123,13 @@ def process_dialog(orig_data):
         temp_dict['src'] = src
         temp_dict['trg'] = trg
         
+<<<<<<< HEAD
         corpus.append(src)
         corpus.append(trg)
+=======
+        concat.append(src)
+        concat.append(trg)
+>>>>>>> 97cf1befdba30ce2667f9e4536bb52f6149e17ac
         processed.append(temp_dict)
 
         
@@ -154,10 +164,16 @@ def process_sum(orig_data, volumn=101100):
                 corpus.append(src)
                 corpus.append(trg)
 
+<<<<<<< HEAD
                 #End Condition
                 volumn_cnt += 1
                 if volumn_cnt == volumn:
                     break
+=======
+        concat.append(src)
+        concat.append(trg)
+        processed.append(temp_dict)
+>>>>>>> 97cf1befdba30ce2667f9e4536bb52f6149e17ac
 
 
     with open('data/sum/corpus.txt', 'w') as f:
@@ -237,4 +253,8 @@ if __name__ == '__main__':
         for task in ['nmt', 'dialog', 'sum']:
             main(task)
     else: 
+<<<<<<< HEAD
         main(args.task)    
+=======
+        main(args.task)
+>>>>>>> 97cf1befdba30ce2667f9e4536bb52f6149e17ac
