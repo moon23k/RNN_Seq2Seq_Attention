@@ -37,7 +37,9 @@ class Config(object):
 
         self.task = args.task
         self.mode = args.mode
-        self.ckpt = f"ckpt/{self.task}.pt"
+        self.attn_type = args.attention
+        self.ckpt = f"ckpt/{self.task}/{self.attn_type}.pt"
+        self.bidirectional = True if self.direction == 2 else False
 
         if self.task == 'sum':
             self.batch_size = self.batch_size // 4

@@ -1,10 +1,11 @@
 import os, re, json, yaml, argparse
 from datasets import load_dataset
-from tokenizers.models import WordPiece
+from tokenizers.models import WordLevel
 from tokenizers import Tokenizer, normalizers
-from tokenizers.trainers import WordPieceTrainer
+from tokenizers.trainers import WordLevelTrainer
 from tokenizers.pre_tokenizers import Whitespace
 from tokenizers.normalizers import NFD, Lowercase, StripAccents
+
 
 
 
@@ -159,7 +160,6 @@ def process_sum(orig_data, volumn=101100):
                 if volumn_cnt == volumn:
                     break
 
-
     with open('data/sum/corpus.txt', 'w') as f:
         f.write('\n'.join(corpus))
     
@@ -168,17 +168,17 @@ def process_sum(orig_data, volumn=101100):
 
 
 def train_tokenizer(task):
-    assert os.path.exists(corpus_path)
     corpus_path = f'data/{task}/corpus.txt'
+    assert os.path.exists(corpus_path)
     
     assert os.path.exists('config.yaml')
     with open('config.yaml', 'r') as f:
         vocab_config = yaml.load(f, Loader=yaml.FullLoader)['vocab']
 
-    tokenizer = Tokenizer(WordPiece(unk_token="[UNK]"))
+    tokenizer = Tokenizer(WordLevel(unk_token="[UNK]"))
     tokenizer.normalizer = normalizers.Sequence([NFD(), Lowercase(), StripAccents()])
     tokenizer.pre_tokenizer = Whitespace()
-    trainer = WordPieceTrainer(vocab_size=vocab_config['vocab_size'], 
+    trainer = WordLevelTrainer(vocab_size=vocab_config['vocab_size'], 
                                special_tokens=[vocab_config['pad_token'], 
                                                vocab_config['unk_token'],
                                                vocab_config['bos_token'],
@@ -202,7 +202,7 @@ def save_data(task, data_obj):
 
 
 
-def main(task, vocab_size):
+def main(task):
     #Prerequisite
     os.makedirs(f'data/{task}', exist_ok=True)
 
@@ -218,7 +218,7 @@ def main(task, vocab_size):
         processed = process_sum(orig)        
 
     #Train Tokenizer
-    train_tokenizer(task, vocab_size)
+    train_tokenizer(task)
 
     #Save Data
     save_data(task, processed)

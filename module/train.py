@@ -4,6 +4,8 @@ import torch.amp as amp
 import torch.optim as optim
 
 
+
+
 class Trainer:
     def __init__(self, config, model, train_dataloader, valid_dataloader):
         super(Trainer, self).__init__()
@@ -12,6 +14,8 @@ class Trainer:
         self.device = config.device
         self.n_epochs = config.n_epochs
         self.vocab_size = config.vocab_size
+        self.early_stop = config.early_stop
+        self.patience = config.patience
 
         self.device_type = config.device_type
         self.scaler = torch.cuda.amp.GradScaler()
@@ -20,12 +24,11 @@ class Trainer:
         self.train_dataloader = train_dataloader
         self.valid_dataloader = valid_dataloader
 
-        self.criterion = nn.CrossEntropyLoss(ignore_index=config.pad_id, label_smoothing=0.1).to(self.device)
-        self.optimizer = optim.AdamW(self.model.parameters(), lr=config.learning_rate)
+
+        self.optimizer = optim.AdamW(self.model.parameters(), lr=config.lr)
         self.scheduler = optim.lr_scheduler.ReduceLROnPlateau(self.optimizer, 'min')
-        
-        self.early_stop = config.early_stop
-        self.patience = config.patience
+        self.criterion = nn.CrossEntropyLoss(ignore_index=config.pad_id, 
+                                             label_smoothing=0.1).to(self.device)
 
         self.ckpt = config.ckpt
         self.record_path = f"ckpt/{config.task}.json"
@@ -92,6 +95,7 @@ class Trainer:
                         break
 
                 prev_loss = val_loss
+
             
         #save train_records
         with open(self.record_path, 'w') as fp:

@@ -5,7 +5,7 @@ from transformers import BertModel, BertTokenizerFast
 
 
 class Tester:
-    def __init__(self, config, model, test_dataloader, tokenizer):
+    def __init__(self, config, model, tokenizer, test_dataloader):
         super(Tester, self).__init__()
         
         self.model = model
