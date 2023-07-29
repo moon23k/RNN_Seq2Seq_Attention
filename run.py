@@ -15,6 +15,7 @@ from tokenizers.processors import TemplateProcessing
 
 
 
+
 def set_seed(SEED=42):
     random.seed(SEED)
     np.random.seed(SEED)
@@ -38,7 +39,10 @@ class Config(object):
         self.task = args.task
         self.mode = args.mode
         self.attn_type = args.attention
+        self.search_method = args.search
+
         self.ckpt = f"ckpt/{self.task}/{self.attn_type}.pt"
+        self.tokenizer_path = f'data/{self.task}/tokenizer.json'
         self.bidirectional = True if self.direction == 2 else False
 
         if self.task == 'sum':
@@ -46,13 +50,10 @@ class Config(object):
 
         use_cuda = torch.cuda.is_available()
         self.device_type = 'cuda' if use_cuda else 'cpu'
-        
-        if self.task == 'inference':
-            self.search_method = args.search
-            self.device = torch.device('cpu')
-        else:
-            self.search = None
-            self.device = torch.device(self.device_type)
+        self.device = torch.device(self.device_type) \
+                      if self.task == 'inference' \
+                      else torch.device('cpu')
+            
 
 
     def print_attr(self):
@@ -62,10 +63,9 @@ class Config(object):
 
 
 def load_tokenizer(config):
-    tokenizer_path = f"data/{config.task}/tokenizer.json"
-    assert os.path.exists(tokenizer_path)
+    assert os.path.exists(config.tokenizer_path)
 
-    tokenizer = Tokenizer.from_file(tokenizer_path)    
+    tokenizer = Tokenizer.from_file(config.tokenizer_path)    
     tokenizer.post_processor = TemplateProcessing(
         single=f"{config.bos_token} $A {config.eos_token}",
         special_tokens=[(config.bos_token, config.bos_id), 
@@ -137,10 +137,8 @@ if __name__ == '__main__':
     
     args = parser.parse_args()
     assert args.task in ['nmt', 'dialog', 'sum']
-    assert args.attention in ['additive', 'dot_product', 'scaled_dot_product']
     assert args.mode in ['train', 'test', 'inference']
-
-    if args.task == 'inference':
-        assert args.search in ['greedy', 'beam']
+    assert args.attention in ['additive', 'dot_product', 'scaled_dot_product']
+    assert args.search in ['greedy', 'beam']
 
     main(args)

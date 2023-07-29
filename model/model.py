@@ -1,9 +1,11 @@
 import random, torch
 import torch.nn as nn
 import torch.nn.functional as F
-from model.attention import (AdditiveAttention, 
-                             DotProductAttention, 
-                             ScaledDotProductAttention)
+from model.attention import (
+    AdditiveAttention, 
+    DotProductAttention, 
+    ScaledDotProductAttention
+)
 
 
 
@@ -11,16 +13,20 @@ from model.attention import (AdditiveAttention,
 class Encoder(nn.Module):
     def __init__(self, config):
         super(Encoder, self).__init__()
-        self.embedding = nn.Embedding(config.vocab_size, config.emb_dim)
-        self.rnn = nn.GRU(config.emb_dim, 
-                          config.hidden_dim, 
-                          bidirectional=True, 
-                          batch_first=True)
-        self.fc = nn.Linear(config.hidden_dim * 2, config.hidden_dim)
-        self.dropout = nn.Dropout(config.dropout_ratio)
 
-    def forward(self, src):
-        embedded = self.dropout(self.embedding(src))
+        self.embedding = nn.Embedding(config.vocab_size, config.emb_dim)
+        self.dropout = nn.Dropout(config.dropout_ratio)
+        self.rnn = nn.GRU(
+            config.emb_dim, 
+            config.hidden_dim, 
+            bidirectional=True, 
+            batch_first=True
+        )
+        self.fc = nn.Linear(config.hidden_dim * 2, config.hidden_dim)
+        
+
+    def forward(self, x):
+        embedded = self.dropout(self.embedding(x))
         out, hidden = self.rnn(embedded)
         
         hidden = torch.cat((hidden[0], hidden[1]), dim=1)
@@ -34,6 +40,7 @@ class Decoder(nn.Module):
     def __init__(self, config):
         super(Decoder, self).__init__()
         self.output_dim = config.vocab_size
+        self.dropout = nn.Dropout(config.dropout_ratio)
         
         if config.attn_type == 'additive':
             self.attention = AdditiveAttention(config.hidden_dim)
@@ -44,11 +51,17 @@ class Decoder(nn.Module):
 
 
         self.emb = nn.Embedding(self.output_dim, config.emb_dim)
-        self.rnn = nn.GRU((config.hidden_dim * 2) + config.emb_dim, 
-                          config.hidden_dim, 
-                          batch_first=True)
-        self.fc_out = nn.Linear((config.hidden_dim * 3) + config.emb_dim, self.output_dim)
-        self.dropout = nn.Dropout(config.dropout_ratio)
+        
+        self.rnn = nn.GRU(
+            (config.hidden_dim * 2) + config.emb_dim, 
+            config.hidden_dim, 
+            batch_first=True
+        )
+        
+        self.fc_out = nn.Linear(
+            (config.hidden_dim * 3) + config.emb_dim, 
+            self.output_dim
+        )
         
 
     def forward(self, x, enc_out, hidden):

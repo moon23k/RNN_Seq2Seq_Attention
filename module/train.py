@@ -27,8 +27,11 @@ class Trainer:
 
         self.optimizer = optim.AdamW(self.model.parameters(), lr=config.lr)
         self.scheduler = optim.lr_scheduler.ReduceLROnPlateau(self.optimizer, 'min')
-        self.criterion = nn.CrossEntropyLoss(ignore_index=config.pad_id, 
-                                             label_smoothing=0.1).to(self.device)
+        
+        self.criterion = nn.CrossEntropyLoss(
+            ignore_index=config.pad_id, 
+            label_smoothing=0.1
+        ).to(self.device)
 
         self.ckpt = config.ckpt
         self.record_path = f"ckpt/{config.task}.json"
@@ -112,9 +115,14 @@ class Trainer:
             trg = batch['trg'].to(self.device)
 
             with torch.autocast(device_type=self.device_type, dtype=torch.float16):
+                
                 logit = self.model(src, trg)
-                loss = self.criterion(logit.contiguous().view(-1, self.vocab_size),
-                                      trg[:, 1:].contiguous().view(-1))
+                
+                loss = self.criterion(
+                    logit.contiguous().view(-1, self.vocab_size),
+                    trg[:, 1:].contiguous().view(-1)
+                )
+
                 loss = loss / self.iters_to_accumulate
             #Backward Loss
             self.scaler.scale(loss).backward()        
@@ -122,7 +130,11 @@ class Trainer:
             if (idx + 1) % self.iters_to_accumulate == 0:
                 #Gradient Clipping
                 self.scaler.unscale_(self.optimizer)
-                nn.utils.clip_grad_norm_(self.model.parameters(), max_norm=self.clip)
+                
+                nn.utils.clip_grad_norm_(
+                    self.model.parameters(), 
+                    max_norm=self.clip
+                )
                 
                 #Gradient Update & Scaler Update
                 self.scaler.step(self.optimizer)
@@ -147,8 +159,11 @@ class Trainer:
                 trg = batch['trg'].to(self.device)
                 
                 logit = self.model(src, trg, teacher_forcing_ratio=0.0)
-                loss = self.criterion(logit.contiguous().view(-1, self.vocab_size),
-                                      trg[:, 1:].contiguous().view(-1))
+                loss = self.criterion(
+                    logit.contiguous().view(-1, self.vocab_size),
+                    trg[:, 1:].contiguous().view(-1)
+                )
+                
                 epoch_loss += loss.item()
         
         epoch_loss = round(epoch_loss / tot_len, 3)

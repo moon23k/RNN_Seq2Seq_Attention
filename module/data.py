@@ -22,7 +22,7 @@ class Dataset(torch.utils.data.Dataset):
     def __getitem__(self, idx):
         src = self.tokenizer.encode(self.data[idx]['src']).ids
         trg = self.tokenizer.encode(self.data[idx]['trg']).ids
-        return src, trg
+        return torch.LongTensor(src), torch.LongTensor(trg)
 
 
 
@@ -32,12 +32,7 @@ class Collator(object):
 
     def __call__(self, batch):
 
-        src_batch, trg_batch = [], []
-        
-        for src, trg in batch:
-            src_batch.append(torch.LongTensor(src))
-            trg_batch.append(torch.LongTensor(trg))
-        
+        src_batch, trg_batch = zip(*batch)        
         src_batch = self.pad_batch(src_batch)
         trg_batch = self.pad_batch(trg_batch)
         
@@ -51,9 +46,11 @@ class Collator(object):
 
 
 def load_dataloader(config, tokenizer, split):
-    return DataLoader(Dataset(tokenizer, config.task, split), 
-                      batch_size=config.batch_size if config.mode=='train' else 1, 
-                      shuffle=True if config.mode=='train' else False,
-                      collate_fn=Collator(config.pad_id),
-                      pin_memory=True,
-                      num_workers=2)
+    return DataLoader(
+        Dataset(tokenizer, config.task, split), 
+        batch_size=config.batch_size if split=='train' else 1, 
+        shuffle=True if split=='train' else False,
+        collate_fn=Collator(config.pad_id),
+        pin_memory=True,
+        num_workers=2
+    )

@@ -1,4 +1,4 @@
-import torch, math, time, evaluate
+import math, torch, evaluate
 from module.search import Search
 from transformers import BertModel, BertTokenizerFast
 
