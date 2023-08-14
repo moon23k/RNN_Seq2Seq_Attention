@@ -6,20 +6,21 @@ from collections import namedtuple
 
 
 
-class Search:
-    def __init__(self, config, model):
+class Generator:
+    def __init__(self, config, model, tokenizer):
         super(Search, self).__init__()
         
         self.beam_size = 4
         self.model = model
         self.task = config.task
+        self.tokenizer = tokenizer
         self.device = config.device
         
         self.bos_id = config.bos_id
         self.eos_id = config.eos_id
         self.pad_id = config.pad_id
 
-        self.max_len = config.max_pred_len
+        self.max_len = config.max_len
         self.Node = namedtuple('Node', ['prev_node', 'pred', 'log_prob', 'hiddens', 'length'])
 
 

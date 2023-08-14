@@ -1,22 +1,25 @@
 import numpy as np
-import os, yaml, random, argparse
-
-import torch
-import torch.backends.cudnn as cudnn
-
-from module.test import Tester
-from module.train import Trainer
-from module.search import Search
-from module.model import load_model
-from module.data import load_dataloader
+import os, yaml, argparse, torch
 
 from tokenizers import Tokenizer
 from tokenizers.processors import TemplateProcessing
+
+from module import (
+    load_dataloader,
+    load_model,
+    Trainer, 
+    Tester,
+    Generator
+)
 
 
 
 
 def set_seed(SEED=42):
+    import random
+    import numpy as np
+    import torch.backends.cudnn as cudnn
+    
     random.seed(SEED)
     np.random.seed(SEED)
     torch.manual_seed(SEED)
@@ -49,10 +52,10 @@ class Config(object):
             self.batch_size = self.batch_size // 4
 
         use_cuda = torch.cuda.is_available()
-        self.device_type = 'cuda' if use_cuda else 'cpu'
-        self.device = torch.device(self.device_type) \
-                      if self.task == 'inference' \
-                      else torch.device('cpu')
+        self.device_type = 'cuda' \
+                           if use_cuda and self.mode != 'inference' \
+                           else 'cpu'
+        self.device = torch.device(self.device_type)
             
 
 
@@ -77,9 +80,7 @@ def load_tokenizer(config):
 
 
 def inference(config, model, tokenizer):
-    if config.search_method == 'beam':
-        beam = Search(config, model)
-    search_module = Search(config, model)
+    generator = Generator(config, model, tokenizer)
 
     print(f'--- Inference Process Started! ---')
     print('[ Type "quit" on user input to stop the Process ]')
@@ -87,21 +88,13 @@ def inference(config, model, tokenizer):
     while True:
         input_seq = input('\nUser Input Sequence >> ').lower()
 
-        #Enc Condition
+        #End Condition
         if input_seq == 'quit':
-            print('\n--- Inference Process has Terminated! ---')
+            print('\n--- Inference Process has terminated! ---')
             break        
 
-        input_tensor = torch.LongTensor(tokenizer.encode(input_seq)).unsqueeze(0)
-
-
-        if config.search_method == 'greedy':
-            pred_tensor = search_module.greedy_search(input_tensor)
-        elif config.search_method == 'beam':
-            pred_tensor = search_module.beam_search(input_tensor)
-
-        pred_seq = tokenizer.decode(pred_tensor)
-        print(f"Model Out Sequence >> {tokenizer.decode(pred_seq)}")
+        output_seq = generator.generate(input_seq, search=config.search)
+        print(f"Model Out Sequence >> {output_seq}")       
 
 
 
@@ -110,20 +103,25 @@ def main(args):
     config = Config(args)
     model = load_model(config)
     tokenizer = load_tokenizer(config)
+    generator = Generator(config, model, tokenizer) \
+                if config.mode != 'train' else None
+
 
     if config.mode == 'train':
         train_dataloader = load_dataloader(config, tokenizer, 'train')
         valid_dataloader = load_dataloader(config, tokenizer, 'valid')
         trainer = Trainer(config, model, train_dataloader, valid_dataloader)
         trainer.train()
-    
+
+
     elif config.mode == 'test':
         test_dataloader = load_dataloader(config, tokenizer, 'test')
-        tester = Tester(config, model, tokenizer, test_dataloader)
+        tester = Tester(config, model, generator, test_dataloader)
         tester.test()
+
     
     elif config.mode == 'inference':
-        inference(model, tokenizer)
+        inference(model, generator)
         
     
 

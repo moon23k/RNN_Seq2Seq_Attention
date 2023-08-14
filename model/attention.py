@@ -18,6 +18,7 @@ class AdditiveAttention(nn.Module):
         return context, attn
 
 
+
 class DotProductAttention(nn.Module):
     def __init__(self):
         super(DotProductAttention, self).__init__()

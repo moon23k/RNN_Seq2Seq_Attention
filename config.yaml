@@ -16,6 +16,7 @@ model:
     hidden_dim: 512
     n_layers: 2
     dropout_ratio: 0.5
+    max_len: 512
 
 
 train:
