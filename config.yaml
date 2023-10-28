@@ -21,7 +21,7 @@ model:
 
 train:
     n_epochs: 10
-    batch_size: 128
+    batch_size: 32
     lr: 0.001
     early_stop: 1
     patience: 3
