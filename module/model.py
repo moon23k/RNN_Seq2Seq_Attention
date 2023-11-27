@@ -1,6 +1,6 @@
 import torch, os
 import torch.nn as nn
-from model.model import SeqGenModel
+from model import Seq2SeqModel
 
 
 
@@ -32,7 +32,7 @@ def print_model_desc(model):
 
 
 def load_model(config):
-    model = SeqGenModel(config)    
+    model = Seq2SeqModel(config)    
     init_weights(model)
 
     print(f"Initialized model for {config.task} task has loaded")
