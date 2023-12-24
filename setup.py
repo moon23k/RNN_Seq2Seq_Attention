@@ -1,8 +1,8 @@
 import os, re, json, yaml, argparse
 from datasets import load_dataset
-from tokenizers.models import BPE
 from tokenizers import Tokenizer, normalizers
-from tokenizers.trainers import BpeTrainer
+from tokenizers.models import WordLevel
+from tokenizers.trainers import WordLevelTrainer
 from tokenizers.pre_tokenizers import Whitespace
 from tokenizers.normalizers import NFD, Lowercase, StripAccents
 
@@ -124,7 +124,7 @@ def process_dialogue_data(data_volumn):
 def process_summarization_data(data_volumn):    
     volumn_cnt = 0
     corpus, processed = [], []
-    min_len, max_len = 500, 2300
+    min_len, max_len = 500, 2200
 
     #Load Original Dataset
     cnn_data = load_dataset('cnn_dailymail', '3.0.0')
@@ -168,18 +168,22 @@ def train_tokenizer(task):
     with open('config.yaml', 'r') as f:
         vocab_config = yaml.load(f, Loader=yaml.FullLoader)['vocab']
 
-    tokenizer = Tokenizer(BPE(unk_token=vocab_config['unk_token']))
-    tokenizer.normalizer = normalizers.Sequence([NFD(), Lowercase(), StripAccents()])
+    tokenizer = Tokenizer(WordLevel(unk_token=vocab_config['unk_token']))
+    tokenizer.normalizer = normalizers.Sequence(
+        [NFD(), Lowercase(), StripAccents()]
+    )
     tokenizer.pre_tokenizer = Whitespace()
-    trainer = BpeTrainer(
+    trainer = WordLevelTrainer(
         vocab_size=vocab_config['vocab_size'], 
+        min_frequency=2, 
         special_tokens=[
             vocab_config['pad_token'], 
             vocab_config['unk_token'],
             vocab_config['bos_token'],
             vocab_config['eos_token']
             ]
-        )
+    )
+
 
     tokenizer.train(files=[corpus_path], trainer=trainer)
     tokenizer.save(f"data/{task}/tokenizer.json")
@@ -188,7 +192,7 @@ def train_tokenizer(task):
 
 def save_data(task, data_obj):
     #split data into train/valid/test sets
-    train, valid, test = data_obj[:-5100], data_obj[-5100:-100], data_obj[-100:]
+    train, valid, test = data_obj[:-1100], data_obj[-1100:-100], data_obj[-100:]
     data_dict = {k:v for k, v in zip(['train', 'valid', 'test'], [train, valid, test])}
 
     for key, val in data_dict.items():
@@ -204,7 +208,7 @@ def main(task):
     os.makedirs(f'data/{task}', exist_ok=True)
 
     #PreProcess Data
-    data_volumn = 55100
+    data_volumn = 51100
     if task == 'translation':
         processed = process_translation_data(data_volumn)
     elif task == 'dialogue':
@@ -231,4 +235,4 @@ if __name__ == '__main__':
         for task in ['translation', 'dialogue', 'summarization']:
             main(task)
     else: 
-        main(args.task)    
+        main(args.task)
