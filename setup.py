@@ -124,7 +124,7 @@ def process_dialogue_data(data_volumn):
 def process_summarization_data(data_volumn):    
     volumn_cnt = 0
     corpus, processed = [], []
-    min_len, max_len = 500, 2200
+    min_len, max_len = 500, 2300
 
     #Load Original Dataset
     cnn_data = load_dataset('cnn_dailymail', '3.0.0')
@@ -208,7 +208,7 @@ def main(task):
     os.makedirs(f'data/{task}', exist_ok=True)
 
     #PreProcess Data
-    data_volumn = 51100
+    data_volumn = 31100
     if task == 'translation':
         processed = process_translation_data(data_volumn)
     elif task == 'dialogue':
