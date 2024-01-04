@@ -55,10 +55,10 @@ class Tester:
         pred[:, 0] = self.bos_id
 
         pred_token = torch.empty(batch_size, dtype=torch.long, device=self.device).fill_(self.bos_id)
-        enc_out, hidden = self.model.encoder(x)
+        enc_out, hidden, enc_mask = self.model.encoder(x)
 
         for t in range(self.max_len):
-            out, hidden = self.model.decoder(pred_token.unsqueeze(1), hidden, enc_out)
+            out, hidden, weight = self.model.decoder(pred_token.unsqueeze(1), hidden, enc_out, enc_mask)
             pred_token = out.argmax(-1)
             pred[:, t] = pred_token
 

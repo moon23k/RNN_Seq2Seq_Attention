@@ -124,7 +124,7 @@ def process_dialogue_data(data_volumn):
 def process_summarization_data(data_volumn):    
     volumn_cnt = 0
     corpus, processed = [], []
-    min_len, max_len = 500, 2300
+    min_len, max_len = 500, 1900
 
     #Load Original Dataset
     cnn_data = load_dataset('cnn_dailymail', '3.0.0')
