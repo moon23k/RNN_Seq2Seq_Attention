@@ -5,7 +5,6 @@ from collections import namedtuple
 
 
 
-
 class Encoder(nn.Module):
     def __init__(self, config):
         super(Encoder, self).__init__()
@@ -71,6 +70,7 @@ class Decoder(nn.Module):
         self.out = nn.Linear(self.H, config.vocab_size)
 
         self.attention = Attention(config).to(config.device)
+
 
     def forward(self, x, hidden, encoder_outputs):
         embedded = self.dropout(self.embedding(x))

@@ -114,7 +114,7 @@ if __name__ == '__main__':
     args = parser.parse_args()
     assert args.task in ['translation', 'dialogue', 'summarization']
     assert args.mode in ['train', 'test', 'inference']
-    assert args.attention in ['additive', 'dot_product', 'scaled_dot_product']
+    assert args.attention in ['concat', 'dot', 'general']
     assert args.search in ['greedy', 'beam']
 
     os.makedirs(f'ckpt/{args.task}', exist_ok=True)
